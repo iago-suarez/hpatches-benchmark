@@ -32,6 +32,8 @@ desc_info = {
     'hardnet-liberty': Descriptor(name='HNet-LIB', color='chocolate'),
     'deepdesc-ubc': Descriptor(name='DDesc-LIB', color='black'),
     'NCC': Descriptor(name='LearnedSIFT', color='blue'),
+    'misigma': Descriptor(name='MeanStd', color='red'),
+
     # Add you own descriptors as below:
     # 'desc':
     # Descriptor(name='Desc++', color='darksalmon'),
