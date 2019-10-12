@@ -38,6 +38,14 @@ desc_info = {
     'BELID_512': Descriptor(name='BELID-512', color='green'),
     'BELID_256': Descriptor(name='BELID-256', color='green'),
     'BELID_128': Descriptor(name='BELID-128', color='green'),
+    'ADA-512-HPATHCES': Descriptor(name='Ada512HAll', color='blue'),
+    'ADA-512-HPATCHES-EASY': Descriptor(name='Ada512HEasy', color='blue'),
+    'ADA-512-HPATCHES-EASY2': Descriptor(name='Ada512HEasy2', color='blue'),
+    'BELBID_260_AverageBoxThresholdedWL': Descriptor(name='EasyBELBID260', color='blue'),
+    'EasyAdaboost_512_AverageBoxThresholdedWL': Descriptor(name='EasyAda512', color='blue'),
+    'LibAdaboost_512_AverageBoxThresholdedWL': Descriptor(name='LibAda512', color='blue'),
+    'FPBoostMatrix-Adaboost_512-512_AverageBoxThresholdedWL': Descriptor(name='EasyFPBooAda512', color='blue'),
+
     # Add you own descriptors as below:
     # 'desc':
     # Descriptor(name='Desc++', color='darksalmon'),

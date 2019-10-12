@@ -13,12 +13,12 @@ ft = {'e': 'Easy', 'h': 'Hard', 't': 'Tough'}
 
 
 class DescriptorMatchingResult:
-    def __init__(self, desc, splt):
+    def __init__(self, desc, splt, results_dir='results'):
         matching_results = defaultdict(
             lambda: defaultdict(lambda: defaultdict(dict)))
         res = dill.load(
             open(
-                os.path.join("results",
+                os.path.join(results_dir,
                              desc + "_matching_" + splt['name'] + ".p"), "rb"))
 
         for seq in res:
@@ -48,10 +48,10 @@ class DescriptorMatchingResult:
 
 
 class DescriptorRetrievalResult:
-    def __init__(self, desc, splt):
+    def __init__(self, desc, splt, results_dir='results'):
         res = dill.load(
             open(
-                os.path.join("results",
+                os.path.join(results_dir,
                              desc + "_retrieval_" + splt['name'] + ".p"),
                 "rb"))
 
@@ -78,7 +78,7 @@ class DescriptorRetrievalResult:
 
 
 class DescriptorVerificationResult:
-    def __init__(self, desc, splt):
+    def __init__(self, desc, splt, results_dir='results'):
         metric = {'balanced': 'auc', 'imbalanced': 'ap'}
         self.desc = desc
         self.splt = splt
@@ -86,7 +86,7 @@ class DescriptorVerificationResult:
         res = dill.load(
             open(
                 os.path.join(
-                    "results",
+                    results_dir,
                     self.desc + "_verification_" + self.splt['name'] + ".p"),
                 "rb"))
 
@@ -113,12 +113,12 @@ class DescriptorVerificationResult:
 
 
 class DescriptorHPatchesResult:
-    def __init__(self, desc, splt):
+    def __init__(self, desc, splt, results_dir='results'):
         self.desc = desc
         self.splt = splt
-        self.verification = DescriptorVerificationResult(desc, splt)
-        self.matching = DescriptorMatchingResult(desc, splt)
-        self.retrieval = DescriptorRetrievalResult(desc, splt)
+        self.verification = DescriptorVerificationResult(desc, splt, results_dir)
+        self.matching = DescriptorMatchingResult(desc, splt, results_dir)
+        self.retrieval = DescriptorRetrievalResult(desc, splt, results_dir)
 
 
 def plot_verification(hpatches_results, ax, **kwargs):
@@ -412,7 +412,7 @@ def plot_retrieval(hpatches_results, ax, **kwargs):
     return ax
 
 
-def plot_hpatches_results(hpatches_results):
+def plot_hpatches_results(hpatches_results, out_dir='.'):
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif')
     plt.rc('text.latex', preamble=r'\usepackage{amssymb} \usepackage{color}')
@@ -474,4 +474,4 @@ def plot_hpatches_results(hpatches_results):
     ax_matching.set_xlabel(r'Image Matching mAP [\%]', fontsize=15)
     ax_retrieval.set_xlabel(r'Patch Retrieval mAP [\%]', fontsize=15)
 
-    f.savefig('hpatches_results.pdf')
+    f.savefig(os.path.join(out_dir, 'hpatches_results.pdf'))
