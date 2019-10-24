@@ -1,20 +1,25 @@
-from scipy import spatial
+import os.path
+import time
+from collections import defaultdict
+
 import numpy as np
 import pandas as pd
 import utils.metrics as metrics
-from collections import defaultdict
-import time
+from joblib import Parallel, delayed
+from scipy import spatial
 from tqdm import tqdm
-import os.path
 from utils.hpatch import get_patch
 from utils.misc import green
+# import ray
+
+PARALLEL_EVALUATION = True
 
 id2t = {0: {'e': 'ref', 'h': 'ref', 't': 'ref'},
-        1: {'e': 'e1',  'h': 'h1', 't': 't1'},
-        2: {'e': 'e2',  'h': 'h2', 't': 't2'},
-        3: {'e': 'e3',  'h': 'h3', 't': 't3'},
-        4: {'e': 'e4',  'h': 'h4', 't': 't4'},
-        5: {'e': 'e5',  'h': 'h5', 't': 't5'}}
+        1: {'e': 'e1', 'h': 'h1', 't': 't1'},
+        2: {'e': 'e2', 'h': 'h2', 't': 't2'},
+        3: {'e': 'e3', 'h': 'h3', 't': 't3'},
+        4: {'e': 'e4', 'h': 'h4', 't': 't4'},
+        5: {'e': 'e5', 'h': 'h5', 't': 't5'}}
 
 tp = ['e', 'h', 't']
 
@@ -51,6 +56,7 @@ def get_verif_dists(descr, pairs, op):
     idx = 0
     pbar = tqdm(pairs)
     pbar.set_description("Processing verification task %i/3 " % op)
+
     for p in pbar:
         [t1, t2] = [id2t[p[1]], id2t[p[4]]]
         for t in tp:
@@ -183,7 +189,9 @@ def eval_matching(descr, split):
 
     results = defaultdict(lambda: defaultdict(lambda: defaultdict(dict)))
     pbar = tqdm(split['test'])
-    for seq in pbar:
+
+    # @ray.remote
+    def eval_matching_seq(seq):
         d_ref = getattr(descr[seq], 'ref')
         gt_l = np.arange(d_ref.shape[0])
         for t in tp:
@@ -200,6 +208,21 @@ def eval_matching(descr, split):
                 results[seq][t][i]['pr'] = pr
                 results[seq][t][i]['rc'] = rc
                 # print(t,i,ap,results[seq][t][i]['sr'])
+
+    if PARALLEL_EVALUATION:
+        # # Call the function train_ith_wl_in_parallel using all the CPUs but one
+        Parallel(n_jobs=-2,
+                 backend='threading',
+                 require='sharedmem',
+                 prefer='threads')(delayed(eval_matching_seq)(seq) for seq in pbar)
+        # num_cpus = psutil.cpu_count(logical=False)
+        # ray.init(num_cpus=num_cpus)
+        # for seq in pbar:
+        #     eval_matching_seq.remote(seq)
+
+    else:
+        list(map(eval_matching_seq, pbar))
+
     end = time.time()
     print(">> %s task finished in %.0f secs  " % (green('Matching'),
                                                   end - start))
@@ -256,7 +279,9 @@ def eval_retrieval(descr, split):
 
     pbar = tqdm(range(desc_q.shape[0]))
     pbar.set_description("Processing retrieval task")
-    for i in pbar:
+
+    # for i in pbar:
+    def eval_retrieval_seq(i):
         for t in tp:
             D_intra = get_query_intra_dists(descr, desc_q[i], q[i], t)
             D_ = D[i, :]
@@ -277,6 +302,15 @@ def eval_retrieval(descr, split):
                 # gt_perm = gt[perm]
                 # mi_rank = np.mean(np.where(gt_perm))
                 # results[i][t][k]['mi_rank'] = mi_rank
+
+    if PARALLEL_EVALUATION:
+        # Call the function train_ith_wl_in_parallel using all the CPUs but one
+        Parallel(n_jobs=-2,
+                 backend='threading',
+                 require='sharedmem',
+                 prefer='threads')(delayed(eval_retrieval_seq)(i) for i in pbar)
+    else:
+        list(map(eval_retrieval_seq, pbar))
     end = time.time()
     print(">> %s task finished in %.0f secs  " % (green('Retrieval'),
                                                   end - start))
@@ -297,7 +331,7 @@ def gen_retrieval(seqs, split, N_queries=0.5 * 1e4, N_distractors=2 * 1e4):
     s_d_idx = [np.random.randint(k) for k in s_d_N]
     s_d_idx = np.array(s_d_idx)
 
-    msk = np.zeros((s_q.shape[0], ))
+    msk = np.zeros((s_q.shape[0],))
     for i in range(s_q.shape[0]):
         p = get_patch(seqs[s_q[i]], 'ref', s_q_idx[i])
         if np.std(p) > 10:
@@ -307,7 +341,7 @@ def gen_retrieval(seqs, split, N_queries=0.5 * 1e4, N_distractors=2 * 1e4):
     s_q = s_q[msk]
     s_q_idx = s_q_idx[msk]
 
-    msk = np.zeros((s_d.shape[0], ))
+    msk = np.zeros((s_d.shape[0],))
     for i in range(s_d.shape[0]):
         p = get_patch(seqs[s_d[i]], 'ref', s_d_idx[i])
         if np.std(p) > 10:
