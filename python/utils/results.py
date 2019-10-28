@@ -1,13 +1,13 @@
-import dill
-import os.path
-import numpy as np
-from collections import defaultdict
-import matplotlib.pyplot as plt
-import matplotlib.lines as mlines
-from utils.config import desc_info, figure_attributes
 import itertools
 import operator
-import matplotlib.patches as patches
+import os.path
+from collections import defaultdict
+
+import dill
+import matplotlib.lines as mlines
+import matplotlib.pyplot as plt
+import numpy as np
+from utils.config import desc_info, figure_attributes
 
 ft = {'e': 'Easy', 'h': 'Hard', 't': 'Tough'}
 
@@ -121,18 +121,19 @@ class DescriptorHPatchesResult:
         self.retrieval = DescriptorRetrievalResult(desc, splt, results_dir)
 
 
-def plot_verification(hpatches_results, ax, **kwargs):
+def plot_verification(hpatches_results, ax, use_balanced=False, **kwargs):
+    balance_type = 'balanced' if use_balanced else 'imbalanced'
     hpatches_results.sort(
-        key=operator.attrgetter('verification.avg_imbalanced'), reverse=True)
+        key=operator.attrgetter('verification.avg_' + balance_type), reverse=True)
     descrs = [x.desc for x in hpatches_results]
     y_pos = np.arange(len(descrs))
 
     avg_verifs = [
-        getattr(x.verification, "avg_imbalanced") for x in hpatches_results
+        getattr(x.verification, "avg_" + balance_type) for x in hpatches_results
     ]
 
     cases = list(
-        itertools.product(ft.keys(), ['intra', 'inter'], ['imbalanced']))
+        itertools.product(ft.keys(), ['intra', 'inter'], [balance_type]))
     verification_results = {}
     for case in cases:
         case_results = []
@@ -158,42 +159,42 @@ def plot_verification(hpatches_results, ax, **kwargs):
         alpha=0.8)
 
     ax.plot(
-        verification_results[str(('e', 'inter', 'imbalanced'))],
+        verification_results[str(('e', 'inter', balance_type))],
         y_pos,
         marker=figure_attributes['inter_marker'],
         linestyle="",
         alpha=0.8,
         color=figure_attributes['easy_colour'])
     ax.plot(
-        verification_results[str(('e', 'intra', 'imbalanced'))],
+        verification_results[str(('e', 'intra', balance_type))],
         y_pos,
         marker=figure_attributes['intra_marker'],
         linestyle="",
         alpha=0.8,
         color=figure_attributes['easy_colour'])
     ax.plot(
-        verification_results[str(('h', 'inter', 'imbalanced'))],
+        verification_results[str(('h', 'inter', balance_type))],
         y_pos,
         marker=figure_attributes['inter_marker'],
         linestyle="",
         alpha=0.8,
         color=figure_attributes['hard_colour'])
     ax.plot(
-        verification_results[str(('h', 'intra', 'imbalanced'))],
+        verification_results[str(('h', 'intra', balance_type))],
         y_pos,
         marker=figure_attributes['intra_marker'],
         linestyle="",
         alpha=0.8,
         color=figure_attributes['hard_colour'])
     ax.plot(
-        verification_results[str(('t', 'inter', 'imbalanced'))],
+        verification_results[str(('t', 'inter', balance_type))],
         y_pos,
         marker=figure_attributes['inter_marker'],
         linestyle="",
         alpha=0.8,
         color=figure_attributes['tough_colour'])
     ax.plot(
-        verification_results[str(('t', 'intra', 'imbalanced'))],
+        verification_results[str(('t', 'intra', balance_type))],
         y_pos,
         marker=figure_attributes['intra_marker'],
         linestyle="",
@@ -412,7 +413,7 @@ def plot_retrieval(hpatches_results, ax, **kwargs):
     return ax
 
 
-def plot_hpatches_results(hpatches_results, out_dir='.'):
+def plot_hpatches_results(hpatches_results, out_dir='.', balanced_verification=False):
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif')
     plt.rc('text.latex', preamble=r'\usepackage{amssymb} \usepackage{color}')
@@ -421,7 +422,7 @@ def plot_hpatches_results(hpatches_results, out_dir='.'):
     # The 0.8 is absolute value for blank space at the bottom
     bar_width = 0.3
     descr_height = n_descrs * bar_width + 0.8
-    
+
     # Figure height is descriptor plot height plus fixed 1.2 for header
     figh = 1.2 + descr_height
     f, (ax_verification, ax_matching, ax_retrieval) = plt.subplots(1, 3)
@@ -451,7 +452,7 @@ def plot_hpatches_results(hpatches_results, out_dir='.'):
         handles=[easy_marker, hard_marker, tough_marker],
         loc='lower center',
         ncol=3,
-        bbox_to_anchor=(0.45, 1-0.8/figh, 0.1, 0.0),
+        bbox_to_anchor=(0.45, 1 - 0.8 / figh, 0.1, 0.0),
         handletextpad=-0.5,
         fontsize=12,
         columnspacing=0)
@@ -466,11 +467,15 @@ def plot_hpatches_results(hpatches_results, out_dir='.'):
         left=0.10, bottom=(0.8 / figh), right=None, top=(descr_height / figh),
         wspace=0.7, hspace=None)
 
-    plot_verification(hpatches_results, ax_verification)
+    plot_verification(hpatches_results, ax_verification, use_balanced=balanced_verification)
     plot_matching(hpatches_results, ax_matching)
     plot_retrieval(hpatches_results, ax_retrieval)
 
-    ax_verification.set_xlabel(r'Patch Verification mAP [\%]', fontsize=15)
+    if balanced_verification:
+        ax_verification.set_xlabel(r'Patch Verification AUC [\%]', fontsize=15)
+    else:
+        ax_verification.set_xlabel(r'Patch Verification mAP [\%]', fontsize=15)
+
     ax_matching.set_xlabel(r'Image Matching mAP [\%]', fontsize=15)
     ax_retrieval.set_xlabel(r'Patch Retrieval mAP [\%]', fontsize=15)
 
