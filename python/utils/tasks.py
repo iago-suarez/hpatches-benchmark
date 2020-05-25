@@ -11,6 +11,7 @@ from tqdm import tqdm
 from utils.hpatch import get_patch
 from utils.misc import green
 # import ray
+import cv2
 
 PARALLEL_EVALUATION = True
 
@@ -57,6 +58,7 @@ def get_verif_dists(descr, pairs, op):
     pbar = tqdm(pairs)
     pbar.set_description("Processing verification task %i/3 " % op)
 
+    # TODO Use BFMatcher to calculate this distance
     for p in pbar:
         [t1, t2] = [id2t[p[1]], id2t[p[4]]]
         for t in tp:
@@ -98,26 +100,16 @@ def eval_verification(descr, split):
         d_inter = np.vstack((d_neg_inter[t], d_pos[t]))
 
         # get results for the balanced protocol: 1M Positives - 1M Negatives
-        fpr, tpr, auc = metrics.roc(-d_intra, l)
-        results[t]['intra']['balanced']['fpr'] = fpr
-        results[t]['intra']['balanced']['tpr'] = tpr
+        _, _, auc = metrics.roc(-d_intra, l)
         results[t]['intra']['balanced']['auc'] = auc
-
-        fpr, tpr, auc = metrics.roc(-d_inter, l)
-        results[t]['inter']['balanced']['fpr'] = fpr
-        results[t]['inter']['balanced']['tpr'] = tpr
         results[t]['inter']['balanced']['auc'] = auc
 
         # get results for the imbalanced protocol: 0.2M Pos - 1M Negs
         N_imb = d_pos[t].shape[0] + int(d_pos[t].shape[0] * 0.2)  # 1M + 0.2*1M
-        pr, rc, ap = metrics.pr(-d_intra[0:N_imb], l[0:N_imb])
-        results[t]['intra']['imbalanced']['pr'] = pr
-        results[t]['intra']['imbalanced']['rc'] = rc
+        _, _, ap = metrics.pr(-d_intra[0:N_imb], l[0:N_imb])
         results[t]['intra']['imbalanced']['ap'] = ap
 
-        pr, rc, ap = metrics.pr(-d_inter[0:N_imb], l[0:N_imb])
-        results[t]['inter']['imbalanced']['pr'] = pr
-        results[t]['inter']['imbalanced']['rc'] = rc
+        _, _, ap = metrics.pr(-d_inter[0:N_imb], l[0:N_imb])
         results[t]['inter']['imbalanced']['ap'] = ap
     end = time.time()
     print(">> %s task finished in %.0f secs  " % (green('Verification'),
@@ -200,13 +192,12 @@ def eval_matching(descr, split):
                 D = dist_matrix(d_ref, d, descr['distance'])
                 idx = np.argmin(D, axis=1)
                 m_l = np.equal(idx, gt_l)
-                results[seq][t][i]['sr'] = np.count_nonzero(m_l) / float(
-                    m_l.shape[0])
+                # results[seq][t][i]['sr'] = np.count_nonzero(m_l) / float(m_l.shape[0])
                 m_d = D[gt_l, idx]
                 pr, rc, ap = metrics.pr(-m_d, m_l, numpos=m_l.shape[0])
                 results[seq][t][i]['ap'] = ap
-                results[seq][t][i]['pr'] = pr
-                results[seq][t][i]['rc'] = rc
+                # results[seq][t][i]['pr'] = pr
+                # results[seq][t][i]['rc'] = rc
                 # print(t,i,ap,results[seq][t][i]['sr'])
 
     if PARALLEL_EVALUATION:

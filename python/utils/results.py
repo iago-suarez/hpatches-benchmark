@@ -14,12 +14,8 @@ ft = {'e': 'Easy', 'h': 'Hard', 't': 'Tough'}
 
 class DescriptorMatchingResult:
     def __init__(self, desc, splt, results_dir='results'):
-        matching_results = defaultdict(
-            lambda: defaultdict(lambda: defaultdict(dict)))
-        res = dill.load(
-            open(
-                os.path.join(results_dir,
-                             desc + "_matching_" + splt['name'] + ".p"), "rb"))
+        matching_results = defaultdict(lambda: defaultdict(lambda: defaultdict(dict)))
+        res = dill.load(open(os.path.join(results_dir, desc + "_matching_" + splt['name'] + ".p"), "rb"))
 
         for seq in res:
             seq_type = seq.split("_")[0]
@@ -29,31 +25,25 @@ class DescriptorMatchingResult:
                 matching_results[t][seq_type][seq] = mAP
 
         cases = list(itertools.product(ft.keys(), ['v', 'i']))
-        setattr(self, "avg_v", 0)
-        setattr(self, "avg_i", 0)
+        self.avg_v, self.avg_i = 0, 0
 
         for itm in cases:
             noise_type, seq_type = itm[0], itm[1]
             val = 100 * np.mean(
                 list(matching_results[noise_type][seq_type].values()))
             setattr(self, str(itm), val)
-            setattr(self, "avg_" + seq_type,
-                    getattr(self, "avg_" + seq_type) + val)
+            setattr(self, "avg_" + seq_type, getattr(self, "avg_" + seq_type) + val)
 
         n_samples = float(len(cases)) / 2.0
-        setattr(self, "avg_i", getattr(self, "avg_i") / n_samples)
-        setattr(self, "avg_v", getattr(self, "avg_v") / n_samples)
-        setattr(self, "avg",
-                (getattr(self, "avg_i") + getattr(self, "avg_v")) / 2.0)
+        self.avg_i = self.avg_i / n_samples
+        self.avg_v = self.avg_v / n_samples
+        self.avg = (self.avg_i + self.avg_v) / 2.0
 
 
 class DescriptorRetrievalResult:
     def __init__(self, desc, splt, results_dir='results'):
-        res = dill.load(
-            open(
-                os.path.join(results_dir,
-                             desc + "_retrieval_" + splt['name'] + ".p"),
-                "rb"))
+        self.e, self.h, self.t = None, None, None
+        res = dill.load(open(os.path.join(results_dir, desc + "_retrieval_" + splt['name'] + ".p"), "rb"))
 
         retrieval_results = defaultdict(lambda: defaultdict(dict))
         pool_sizes = [100, 500, 1000, 5000, 10000, 15000, 20000]
@@ -72,9 +62,7 @@ class DescriptorRetrievalResult:
             for psize in pool_sizes:
                 avg_t += np.mean(retrieval_results[t][psize])
             setattr(self, t, avg_t / float(len(pool_sizes)))
-        setattr(self, "avg",
-                (getattr(self, "e") + getattr(self, "h") + getattr(self, "t"))
-                / 3.0)
+        self.avg = (self.e + self.h + self.t) / 3.0
 
 
 class DescriptorVerificationResult:
@@ -83,33 +71,22 @@ class DescriptorVerificationResult:
         self.desc = desc
         self.splt = splt
 
-        res = dill.load(
-            open(
-                os.path.join(
-                    results_dir,
-                    self.desc + "_verification_" + self.splt['name'] + ".p"),
-                "rb"))
+        file_path = os.path.join(results_dir, self.desc + "_verification_" + self.splt['name'] + ".p")
+        res = dill.load(open(file_path, "rb"))
+        cases = list(itertools.product(ft.keys(), ['intra', 'inter'], ['balanced', 'imbalanced']))
 
-        cases = list(
-            itertools.product(ft.keys(), ['intra', 'inter'],
-                              ['balanced', 'imbalanced']))
-
-        setattr(self, "avg_balanced", 0)
-        setattr(self, "avg_imbalanced", 0)
+        self.avg_balanced = 0
+        self.avg_imbalanced = 0
 
         for itm in cases:
             noise_type, negs_type, balance_type = itm[0], itm[1], itm[2]
-            val = 100 * res[noise_type][negs_type][balance_type][
-                metric[balance_type]]
+            val = 100 * res[noise_type][negs_type][balance_type][metric[balance_type]]
             setattr(self, str(itm), val)
-            setattr(self, "avg_" + balance_type,
-                    getattr(self, "avg_" + balance_type) + val)
+            setattr(self, "avg_" + balance_type, getattr(self, "avg_" + balance_type) + val)
 
         n_samples = float(len(cases)) / 2.0
-        setattr(self, "avg_balanced",
-                getattr(self, "avg_balanced") / n_samples)
-        setattr(self, "avg_imbalanced",
-                getattr(self, "avg_imbalanced") / n_samples)
+        self.avg_balanced = self.avg_balanced / n_samples
+        self.avg_imbalanced = self.avg_imbalanced / n_samples
 
 
 class DescriptorHPatchesResult:
@@ -128,9 +105,7 @@ def plot_verification(hpatches_results, ax, use_balanced=False, **kwargs):
     descrs = [x.desc for x in hpatches_results]
     y_pos = np.arange(len(descrs))
 
-    avg_verifs = [
-        getattr(x.verification, "avg_" + balance_type) for x in hpatches_results
-    ]
+    avg_verifs = [getattr(x.verification, "avg_" + balance_type) for x in hpatches_results]
 
     cases = list(
         itertools.product(ft.keys(), ['intra', 'inter'], [balance_type]))
