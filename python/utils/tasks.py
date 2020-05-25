@@ -179,40 +179,34 @@ def eval_matching(descr, split):
     print('>> Evaluating %s task' % green('matching'))
     start = time.time()
 
+    if descr['distance'] == 'L2':
+        bf = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
+    elif descr['distance'] == 'L1':
+        bf = cv2.BFMatcher(cv2.NORM_L1, crossCheck=False)
+    else:
+        raise ValueError('Unknown distance - valid options are |L2|L1|')
+
     results = defaultdict(lambda: defaultdict(lambda: defaultdict(dict)))
     pbar = tqdm(split['test'])
-
-    # @ray.remote
-    def eval_matching_seq(seq):
-        d_ref = getattr(descr[seq], 'ref')
-        gt_l = np.arange(d_ref.shape[0])
+    small = 1e-10
+    for seq in pbar:
+        d_ref = getattr(descr[seq], 'ref').astype(np.float32)
+        correspondences = np.maximum(d_ref.shape[0], small)
+        n_patches_at_ptn = np.maximum(np.arange(correspondences + 1), small)
         for t in tp:
             for i in range(1, 6):
                 d = getattr(descr[seq], t + str(i))
-                D = dist_matrix(d_ref, d, descr['distance'])
-                idx = np.argmin(D, axis=1)
-                m_l = np.equal(idx, gt_l)
-                # results[seq][t][i]['sr'] = np.count_nonzero(m_l) / float(m_l.shape[0])
-                m_d = D[gt_l, idx]
-                pr, rc, ap = metrics.pr(-m_d, m_l, numpos=m_l.shape[0])
+                matches1 = bf.match(d_ref, d.astype(np.float32))
+                matches1.sort(key=lambda m: m.distance)
+                m_l = np.array(list(map(lambda m: m.trainIdx == m.queryIdx, matches1)))
+                my_tp = np.append(0, np.cumsum(m_l))
+                # compute precision and recall
+                recall = my_tp / correspondences
+                precision = np.maximum(my_tp, small) / n_patches_at_ptn
+                # Calculate the average precision using trapezoidal area
+                ap = np.trapz(precision, recall)
+                # An approximation: np.sum(precision[1:][m_l] / correspondences)
                 results[seq][t][i]['ap'] = ap
-                # results[seq][t][i]['pr'] = pr
-                # results[seq][t][i]['rc'] = rc
-                # print(t,i,ap,results[seq][t][i]['sr'])
-
-    if PARALLEL_EVALUATION:
-        # # Call the function train_ith_wl_in_parallel using all the CPUs but one
-        Parallel(n_jobs=-2,
-                 backend='threading',
-                 require='sharedmem',
-                 prefer='threads')(delayed(eval_matching_seq)(seq) for seq in pbar)
-        # num_cpus = psutil.cpu_count(logical=False)
-        # ray.init(num_cpus=num_cpus)
-        # for seq in pbar:
-        #     eval_matching_seq.remote(seq)
-
-    else:
-        list(map(eval_matching_seq, pbar))
 
     end = time.time()
     print(">> %s task finished in %.0f secs  " % (green('Matching'),
