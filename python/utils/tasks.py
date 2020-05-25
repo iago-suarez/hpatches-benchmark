@@ -2,6 +2,8 @@ import os.path
 import time
 from collections import defaultdict
 
+# import ray
+import cv2
 import numpy as np
 import pandas as pd
 import utils.metrics as metrics
@@ -10,8 +12,6 @@ from scipy import spatial
 from tqdm import tqdm
 from utils.hpatch import get_patch
 from utils.misc import green
-# import ray
-import cv2
 
 PARALLEL_EVALUATION = True
 
@@ -29,7 +29,7 @@ tskdir = os.path.normpath(os.path.join(moddir, "..", "..", "tasks"))
 
 
 def seqs_lengths(seqs):
-    ''' Helper method to return length for all seqs'''
+    """ Helper method to return length for all seqs"""
     N = {}
     for seq in seqs:
         N[seq] = seqs[seq].N
@@ -37,11 +37,12 @@ def seqs_lengths(seqs):
 
 
 def dist_matrix(D1, D2, distance):
-    ''' Distance matrix between two sets of descriptors'''
+    """ Distance matrix between two sets of descriptors"""
     if distance == 'L2':
         D = spatial.distance.cdist(D1, D2, 'euclidean')
     elif distance == 'L1':
-        D = spatial.distance.cdist(D1, D2, 'cityblock')
+        # D = spatial.distance.cdist(D1, D2, 'cityblock')
+        D = spatial.distance.cdist(np.unpackbits(D1, axis=1), np.unpackbits(D2, axis=1), 'hamming')
     else:
         raise ValueError('Unknown distance - valid options are |L2|L1|')
     return D
@@ -68,7 +69,10 @@ def get_verif_dists(descr, pairs, op):
             if distance == 'L2':
                 dist = spatial.distance.euclidean(d1, d2)
             elif distance == 'L1':
-                dist = spatial.distance.cityblock(d1, d2)
+                # dist = spatial.distance.cityblock(d1, d2)
+                dist = np.unpackbits(np.bitwise_xor(d1, d2)).sum()
+            else:
+                raise ValueError('Unknown distance - valid options are |L2|L1|')
             d[t][idx] = dist
         idx += 1
     return d
@@ -78,15 +82,9 @@ def eval_verification(descr, split):
     print('>> Evaluating %s task' % green('verification'))
 
     start = time.time()
-    pos = pd.read_csv(
-        os.path.join(tskdir,
-                     'verif_pos_split-' + split['name'] + '.csv')).values
-    neg_intra = pd.read_csv(
-        os.path.join(tskdir,
-                     'verif_neg_intra_split-' + split['name'] + '.csv')).values
-    neg_inter = pd.read_csv(
-        os.path.join(tskdir,
-                     'verif_neg_inter_split-' + split['name'] + '.csv')).values
+    pos = pd.read_csv(os.path.join(tskdir, 'verif_pos_split-' + split['name'] + '.csv')).values
+    neg_intra = pd.read_csv(os.path.join(tskdir, 'verif_neg_intra_split-' + split['name'] + '.csv')).values
+    neg_inter = pd.read_csv(os.path.join(tskdir, 'verif_neg_inter_split-' + split['name'] + '.csv')).values
 
     d_pos = get_verif_dists(descr, pos, 1)
     d_neg_intra = get_verif_dists(descr, neg_intra, 2)
@@ -179,10 +177,12 @@ def eval_matching(descr, split):
     print('>> Evaluating %s task' % green('matching'))
     start = time.time()
 
+    binary = descr['distance'] == 'L1'
+
     if descr['distance'] == 'L2':
         bf = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
     elif descr['distance'] == 'L1':
-        bf = cv2.BFMatcher(cv2.NORM_L1, crossCheck=False)
+        bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=False)
     else:
         raise ValueError('Unknown distance - valid options are |L2|L1|')
 
@@ -190,13 +190,18 @@ def eval_matching(descr, split):
     pbar = tqdm(split['test'])
     small = 1e-10
     for seq in pbar:
-        d_ref = getattr(descr[seq], 'ref').astype(np.float32)
+        d_ref = getattr(descr[seq], 'ref')
+        if not binary:
+            d_ref = d_ref.astype(np.float32)
         correspondences = np.maximum(d_ref.shape[0], small)
         n_patches_at_ptn = np.maximum(np.arange(correspondences + 1), small)
         for t in tp:
             for i in range(1, 6):
                 d = getattr(descr[seq], t + str(i))
-                matches1 = bf.match(d_ref, d.astype(np.float32))
+                if not binary:
+                    d = d.astype(np.float32)
+
+                matches1 = bf.match(d_ref, d)
                 matches1.sort(key=lambda m: m.distance)
                 m_l = np.array(list(map(lambda m: m.trainIdx == m.queryIdx, matches1)))
                 my_tp = np.append(0, np.cumsum(m_l))
@@ -209,25 +214,18 @@ def eval_matching(descr, split):
                 results[seq][t][i]['ap'] = ap
 
     end = time.time()
-    print(">> %s task finished in %.0f secs  " % (green('Matching'),
-                                                  end - start))
+    print(">> %s task finished in %.0f secs  " % (green('Matching'), end - start))
     return results
 
 
 ##################
 # Retrieval task #
 ##################
-def descr_from_idx(descr, idxs):
-    d = np.empty((idxs.shape[0], descr['dim']))
-    for i in range(idxs.shape[0]):
-        d[i] = getattr(descr[idxs[i][0]], 'ref')[idxs[i][1]]
-    return d
-
 
 def get_query_intra_dists(descr, d, query, t):
     idx = query[1]
     seq = query[0]
-    D = np.empty((5))
+    D = np.empty(5)
     d = np.expand_dims(d, axis=0)
 
     for i in range(1, 6):
@@ -241,15 +239,11 @@ def eval_retrieval(descr, split):
     print('>> Evaluating %s task' % green('retrieval'))
     start = time.time()
 
-    q = pd.read_csv(
-        os.path.join(tskdir,
-                     'retr_queries_split-' + split['name'] + '.csv')).values
-    d = pd.read_csv(
-        os.path.join(
-            tskdir, 'retr_distractors_split-' + split['name'] + '.csv')).values
+    q = pd.read_csv(os.path.join(tskdir, 'retr_queries_split-' + split['name'] + '.csv')).values
+    d = pd.read_csv(os.path.join(tskdir, 'retr_distractors_split-' + split['name'] + '.csv')).values
 
-    desc_q = descr_from_idx(descr, q).astype(np.float32)
-    desc_d = descr_from_idx(descr, d).astype(np.float32)
+    desc_q = np.array([descr[scene_name].ref[kp_idx] for scene_name, kp_idx in q])
+    desc_d = np.array([descr[scene_name].ref[kp_idx] for scene_name, kp_idx in d])
 
     # distractor masking per sequence
     m = dict((seq, d[:, 0] != seq) for seq in split['test'])
@@ -265,28 +259,17 @@ def eval_retrieval(descr, split):
     pbar = tqdm(range(desc_q.shape[0]))
     pbar.set_description("Processing retrieval task")
 
-    # for i in pbar:
     def eval_retrieval_seq(i):
         for t in tp:
             D_intra = get_query_intra_dists(descr, desc_q[i], q[i], t)
             D_ = D[i, :]
             D_ = D_[m[q[i][0]]]
             gt = np.zeros_like(D_)
-
             D_ = np.hstack((D_intra, D_))
-
-            # D_[0:5] = D_intra
             gt = np.hstack((np.array([1, 1, 1, 1, 1]), gt))
-            # gt[0:5] = 1
             for k in at_ranks:
-                pr, rc, ap = metrics.pr(-D_[0:k], gt[0:k])
-                # print (pr.shape,rc.shape)
-                # print ap
+                _, _, ap = metrics.pr(-D_[0:k], gt[0:k])
                 results[i][t][k]['ap'] = ap
-                # perm = np.argsort(D_[0:k], kind='mergesort',axis=0)
-                # gt_perm = gt[perm]
-                # mi_rank = np.mean(np.where(gt_perm))
-                # results[i][t][k]['mi_rank'] = mi_rank
 
     if PARALLEL_EVALUATION:
         # Call the function train_ith_wl_in_parallel using all the CPUs but one
@@ -297,8 +280,7 @@ def eval_retrieval(descr, split):
     else:
         list(map(eval_retrieval_seq, pbar))
     end = time.time()
-    print(">> %s task finished in %.0f secs  " % (green('Retrieval'),
-                                                  end - start))
+    print(">> %s task finished in %.0f secs  " % (green('Retrieval'), end - start))
     return results
 
 
