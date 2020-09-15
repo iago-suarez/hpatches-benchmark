@@ -439,8 +439,8 @@ def plot_hpatches_results(hpatches_results, out_dir='.', balanced_verification=F
     # figh - top_margin - bottom_margin = n_descrs * bar_height
     # So descriptor plot height will be directly proportional to n_descr
     plt.subplots_adjust(
-        left=0.10, bottom=(0.8 / figh), right=None, top=(descr_height / figh),
-        wspace=0.7, hspace=None)
+        left=0.2, bottom=(0.8 / figh), right=None, top=(descr_height / figh),
+        wspace=1.8, hspace=None)
 
     plot_verification(hpatches_results, ax_verification, use_balanced=balanced_verification)
     plot_matching(hpatches_results, ax_matching)

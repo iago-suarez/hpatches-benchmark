@@ -41,8 +41,11 @@ def dist_matrix(D1, D2, distance):
     if distance == 'L2':
         D = spatial.distance.cdist(D1, D2, 'euclidean')
     elif distance == 'L1':
+        from utilities import libupmboost_algs
         # D = spatial.distance.cdist(D1, D2, 'cityblock')
-        D = spatial.distance.cdist(np.unpackbits(D1, axis=1), np.unpackbits(D2, axis=1), 'hamming')
+        # D = spatial.distance.cdist(np.unpackbits(D1, axis=1), np.unpackbits(D2, axis=1), 'hamming')
+        D = libupmboost_algs.cpp_numpy_popcount(np.bitwise_xor(D1[:, np.newaxis], D2[np.newaxis]), 2)
+        D = D.astype(np.float32) / 256.0
     else:
         raise ValueError('Unknown distance - valid options are |L2|L1|')
     return D
@@ -52,6 +55,7 @@ def dist_matrix(D1, D2, distance):
 # Verification task #
 #####################
 def get_verif_dists(descr, pairs, op):
+    from utilities import libupmboost_algs
     d = {}
     for t in ['e', 'h', 't']:
         d[t] = np.empty((pairs.shape[0], 1))
@@ -70,7 +74,8 @@ def get_verif_dists(descr, pairs, op):
                 dist = spatial.distance.euclidean(d1, d2)
             elif distance == 'L1':
                 # dist = spatial.distance.cityblock(d1, d2)
-                dist = np.unpackbits(np.bitwise_xor(d1, d2)).sum()
+                # dist = np.unpackbits(np.bitwise_xor(d1, d2)).sum()
+                dist = libupmboost_algs.cpp_numpy_popcount(np.bitwise_xor(d1, d2))
             else:
                 raise ValueError('Unknown distance - valid options are |L2|L1|')
             d[t][idx] = dist
