@@ -13,6 +13,7 @@ from tqdm import tqdm
 from utils.hpatch import get_patch
 from utils.misc import green
 
+
 PARALLEL_EVALUATION = True
 
 id2t = {0: {'e': 'ref', 'h': 'ref', 't': 'ref'},
@@ -55,7 +56,6 @@ def dist_matrix(D1, D2, distance):
 # Verification task #
 #####################
 def get_verif_dists(descr, pairs, op):
-    from utilities import libupmboost_algs
     d = {}
     for t in ['e', 'h', 't']:
         d[t] = np.empty((pairs.shape[0], 1))
@@ -75,6 +75,7 @@ def get_verif_dists(descr, pairs, op):
             elif distance == 'L1':
                 # dist = spatial.distance.cityblock(d1, d2)
                 # dist = np.unpackbits(np.bitwise_xor(d1, d2)).sum()
+                from utilities import libupmboost_algs
                 dist = libupmboost_algs.cpp_numpy_popcount(np.bitwise_xor(d1, d2))
             else:
                 raise ValueError('Unknown distance - valid options are |L2|L1|')

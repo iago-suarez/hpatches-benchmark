@@ -123,7 +123,7 @@ def plot_verification(hpatches_results, ax, use_balanced=False, **kwargs):
     ax.set_yticks(y_pos)
     ax.set_yticklabels([desc_info[x].name for x in descrs], fontsize=14)
     ax.tick_params(axis='both', which='both', length=0)
-    ax.set_xticklabels(np.arange(0, 101, 20), fontsize=12)
+    # ax.set_xticklabels(np.arange(0, 101, 20), fontsize=12)
 
     ax.barh(
         y_pos,
@@ -233,7 +233,7 @@ def plot_matching(hpatches_results, ax, **kwargs):
     ax.set_yticks(y_pos)
     ax.set_yticklabels([desc_info[x].name for x in descrs], fontsize=14)
     ax.tick_params(axis='both', which='both', length=0)
-    ax.set_xticklabels(np.arange(0, 101, 20), fontsize=12)
+    # ax.set_xticklabels(np.arange(0, 101, 20), fontsize=12)
 
     ax.barh(
         y_pos,
@@ -341,7 +341,7 @@ def plot_retrieval(hpatches_results, ax, **kwargs):
     ax.set_yticks(y_pos)
     ax.set_yticklabels([desc_info[x].name for x in descrs], fontsize=14)
     ax.tick_params(axis='both', which='both', length=0)
-    ax.set_xticklabels(np.arange(0, 101, 20), fontsize=12)
+    # ax.set_xticklabels(np.arange(0, 101, 20), fontsize=12)
 
     ax.barh(
         y_pos,
@@ -391,7 +391,7 @@ def plot_retrieval(hpatches_results, ax, **kwargs):
 def plot_hpatches_results(hpatches_results, out_dir='.', balanced_verification=False):
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif')
-    plt.rc('text.latex', preamble=r'\usepackage{amssymb} \usepackage{color}')
+    # plt.rc('text.latex', preamble=r'\usepackage{amssymb} \usepackage{color}')
     n_descrs = len(hpatches_results)
     # The height of the plot for descriptors depend on number of descriptors
     # The 0.8 is absolute value for blank space at the bottom
@@ -402,8 +402,7 @@ def plot_hpatches_results(hpatches_results, out_dir='.', balanced_verification=F
     figh = 1.2 + descr_height
     f, (ax_verification, ax_matching, ax_retrieval) = plt.subplots(1, 3)
     f.set_size_inches(15, figh)
-    f.suptitle(
-        r'{\bf $\mathbb{H}$Patches Results}', fontsize=22, x=0.5, y=0.98)
+    f.suptitle(r'{\bf HPatches Results}', fontsize=22, x=0.5, y=0.98)
 
     easy_marker = mlines.Line2D([], [],
                                 color=figure_attributes['easy_colour'],
