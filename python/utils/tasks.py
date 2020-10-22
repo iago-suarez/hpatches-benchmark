@@ -41,14 +41,16 @@ def dist_matrix(D1, D2, distance):
     """ Distance matrix between two sets of descriptors"""
     if distance == 'L2':
         D = spatial.distance.cdist(D1, D2, 'euclidean')
-    elif distance == 'L1':
+    elif distance == 'HAMMING':
         from utilities import libupmboost_algs
         # D = spatial.distance.cdist(D1, D2, 'cityblock')
         # D = spatial.distance.cdist(np.unpackbits(D1, axis=1), np.unpackbits(D2, axis=1), 'hamming')
         D = libupmboost_algs.cpp_numpy_popcount(np.bitwise_xor(D1[:, np.newaxis], D2[np.newaxis]), 2)
         D = D.astype(np.float32) / 256.0
+    elif distance == 'L1':
+        D = spatial.distance.cdist(D1, D2, 'cityblock')
     else:
-        raise ValueError('Unknown distance - valid options are |L2|L1|')
+        raise ValueError('Unknown distance - valid options are |L2|L1|HAMMING|')
     return D
 
 
@@ -72,13 +74,15 @@ def get_verif_dists(descr, pairs, op):
             distance = descr['distance']
             if distance == 'L2':
                 dist = spatial.distance.euclidean(d1, d2)
-            elif distance == 'L1':
+            elif distance == 'HAMMING':
                 # dist = spatial.distance.cityblock(d1, d2)
                 # dist = np.unpackbits(np.bitwise_xor(d1, d2)).sum()
                 from utilities import libupmboost_algs
                 dist = libupmboost_algs.cpp_numpy_popcount(np.bitwise_xor(d1, d2))
+            elif distance == 'L1':
+                dist = spatial.distance.cityblock(d1, d2)
             else:
-                raise ValueError('Unknown distance - valid options are |L2|L1|')
+                raise ValueError('Unknown distance - valid options are |L2|L1|HAMMING|')
             d[t][idx] = dist
         idx += 1
     return d
@@ -183,14 +187,16 @@ def eval_matching(descr, split):
     print('>> Evaluating %s task' % green('matching'))
     start = time.time()
 
-    binary = descr['distance'] == 'L1'
+    binary = descr['distance'] == 'HAMMING'
 
     if descr['distance'] == 'L2':
         bf = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
-    elif descr['distance'] == 'L1':
+    elif descr['distance'] == 'HAMMING':
         bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=False)
+    elif descr['distance'] == 'L1':
+        bf = cv2.BFMatcher(cv2.NORM_L1, crossCheck=False)
     else:
-        raise ValueError('Unknown distance - valid options are |L2|L1|')
+        raise ValueError('Unknown distance - valid options are |L2|L1|HAMMING|')
 
     results = defaultdict(lambda: defaultdict(lambda: defaultdict(dict)))
     pbar = tqdm(split['test'])
